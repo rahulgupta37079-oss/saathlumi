@@ -1,0 +1,9 @@
+# Copy to .dev.vars; never commit real secrets.
+APP_ORIGIN=https://your-approved-domain.example
+EMAIL_API_KEY=
+EMAIL_FROM=Togetherly <hello@your-approved-domain.example>
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+# Leave false until all operational, tax, merchant and legal checks pass.
+PAYMENTS_ENABLED=false

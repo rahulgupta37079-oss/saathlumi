@@ -1,0 +1,16 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createHmac} from 'node:crypto';
+import {nextPaymentState,paymentMatchesOrder,signPayment,signaturesEqual} from '../src/payment-state.js';
+const order={id:'order_test',user_id:'member_test',amount:29900,currency:'INR'};
+const payment={id:'pay_test',order_id:'order_test',amount:29900,currency:'INR',status:'captured',amount_refunded:0};
+test('captured payment matches exact order user amount and currency',()=>{assert.equal(paymentMatchesOrder(order,payment,'member_test'),true);for(const change of [{amount:299},{currency:'USD'},{order_id:'other'}])assert.equal(paymentMatchesOrder(order,{...payment,...change},'member_test'),false);assert.equal(paymentMatchesOrder(order,payment,'another-member'),false);});
+test('HMAC signatures match provider-compatible SHA256 and reject tampering',async()=>{const body='order_test|pay_test';const expected=createHmac('sha256','fixture-secret').update(body).digest('hex');assert.equal(await signPayment('fixture-secret',body),expected);assert.equal(signaturesEqual(expected,await signPayment('fixture-secret',body+'x')),false);assert.equal(signaturesEqual(expected,''),false);});
+test('webhook raw-body whitespace tampering changes signature',async()=>{const a=await signPayment('fixture-secret','{"event":"payment.captured"}');const b=await signPayment('fixture-secret','{ "event":"payment.captured"}');assert.equal(signaturesEqual(a,b),false);});
+test('pending and authorized payments do not grant captured status',()=>{assert.equal(nextPaymentState('created',{...payment,status:'authorized'}),'created');assert.equal(nextPaymentState('created',{...payment,status:'created'}),'created');});
+test('duplicate captured notifications are idempotent',()=>{const once=nextPaymentState('created',payment);assert.equal(once,'captured');assert.equal(nextPaymentState(once,payment),'captured');});
+test('failed payment remains failed until a confirmed capture',()=>{assert.equal(nextPaymentState('created',{...payment,status:'failed'}),'failed');assert.equal(nextPaymentState('failed',payment),'captured');});
+test('out-of-order failure cannot override captured payment',()=>{assert.equal(nextPaymentState('captured',{...payment,status:'failed'}),'captured');});
+test('full refunds are terminal even when an old capture arrives',()=>{const refunded=nextPaymentState('captured',{...payment,amount_refunded:29900});assert.equal(refunded,'refunded');assert.equal(nextPaymentState(refunded,payment),'refunded');});
+test('partial refund does not silently grant or revoke membership',()=>{assert.equal(nextPaymentState('captured',{...payment,amount_refunded:1000}),'captured');});
+test('disputes revoke access and require manual review even if closed',()=>{assert.equal(nextPaymentState('captured',payment,'payment.dispute.created'),'disputed');assert.equal(nextPaymentState('disputed',payment),'disputed');assert.equal(nextPaymentState('disputed',payment,'payment.dispute.closed'),'disputed');});
