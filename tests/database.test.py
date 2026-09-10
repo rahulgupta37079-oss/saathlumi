@@ -6,13 +6,14 @@ from pathlib import Path
 class SchemaTests(unittest.TestCase):
     def setUp(self):
         self.db = sqlite3.connect(':memory:')
-        self.db.executescript(Path('migrations/0001_initial.sql').read_text())
+        for migration in sorted(Path('migrations').glob('*.sql')):
+            self.db.executescript(migration.read_text())
         for uid in ['a','b','c','d']:
             self.db.execute("INSERT INTO users(id,email,name,password_hash,dob,gender) VALUES(?,?,?,'test-only','1995-01-01','woman')", (uid,uid+'@example.test',uid))
     def booking(self, bid, requester, companion, start=100000, status='accepted'):
         self.db.execute("INSERT INTO bookings(id,requester_id,companion_id,activity,start_at,end_at,venue,introduction,status,expires_at) VALUES(?,?,?,'Coffee',?,?,'Public café','Test only',?,90000)", (bid,requester,companion,start,start+3600,status))
     def test_all_required_tables_exist(self):
-        required={'users','profiles','roles','consent_records','verification_records','availability_rules','availability_exceptions','bookings','conversations','messages','payment_orders','payments','memberships','webhook_events','reviews','reports','blocks','notifications','admin_audit_logs'}
+        required={'users','profiles','roles','consent_records','verification_records','availability_rules','availability_exceptions','bookings','conversations','messages','payment_orders','payments','memberships','webhook_events','reviews','reports','blocks','notifications','admin_audit_logs','notification_preferences','private_plans','private_invitations'}
         found={r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue(required <= found)
     def test_overlap_at_insert(self):

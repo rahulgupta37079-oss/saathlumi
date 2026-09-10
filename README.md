@@ -1,207 +1,170 @@
 # Saathlumi
 
-An adults-only, strictly platonic companion-booking application for India. Warm ivory, deep plum, coral accents, and an editorial, responsive interface.
+A photo-free, adults-only platform for private, strictly platonic meeting interests in India. Members do not browse a public directory. They choose interests, opt in to private in-app invitations, and decide whether to respond.
 
-## Name and availability
+## Status and URLs
 
-The public-facing working name is **Saathlumi** (saath-loo-mee). An exact-name web search on 2026-09-10 returned no indexed matches: https://www.google.com/search?q=%22Saathlumi%22. This is a preliminary search, not a guarantee of uniqueness or legal clearance. Domain registration, social handles, Indian and international trademarks, phonetic/similar-name conflicts, and company-name availability have not been verified or reserved.
-
-Legacy internal identifiers (`togetherly-db`, `__Host-togetherly`, and calendar event UID namespaces) are intentionally unchanged to preserve existing data, sessions, and calendar identity. They are not public branding. Membership rules and the removal of public free-for-women messaging are unchanged.
-
-## Current status
-
-**Working development preview with a tested backend foundation. Not production-ready or approved for live meetings/payments.** This implementation intentionally does not pretend missing providers or operational workflows exist.
+**Development preview; not production-ready.** Accounts, private preferences, meeting-interest creation, in-app invitations/responses, and privacy controls are implemented. Live matching is gated by email confirmation, adult verification, and active membership. Adult verification is not configured; no fake matches or users are presented. Payments, meeting confirmation, and staffed moderation are not operational.
 
 - Preview: https://3000-in1a4e08bsgdp4voh3kqb-18e660f9.sandbox.novita.ai
-- Local: http://localhost:3000
+- Local preview: http://localhost:3000
 - Health: `/api/health`
-- Production: not deployed. Preview URL is temporary.
+- Production: not deployed. The sandbox URL is temporary.
 - Source: `/home/user/webapp`, branch `main`.
-- Stack: Hono, TypeScript, Cloudflare Pages/Workers, D1, vanilla browser JavaScript and CSS.
-- No Node filesystem, in-memory persistence, WebSocket server, KV binding, or scheduled trigger is used at application runtime.
+- Stack: Hono + TypeScript, Cloudflare Pages/Workers, D1, browser JavaScript/CSS.
 
-## Completed interface
+## Name
 
-- Responsive homepage, navigation, lifestyle imagery, four-step explainer, activities, planned cities, membership pricing, safety section, FAQs, and footer.
-- Discovery with name/interest search and city/activity/gender/language filters; date selection displays sample availability. Filter reset and empty states work.
-- Three clearly labelled fictional sample profiles. Images are illustrative, not real members. Samples are not inserted into D1 and cannot receive bookings or messages.
-- Month/week/day calendar explorer, IST-labelled sample times, duration, public venue, introduction, consent checkbox, and a non-persisted request preview dialog.
-- Registration, login, logout, password-reset and email-verification forms.
-- D1-connected private profile editing, account dashboard/membership status, account export, and deletion-request submission.
-- Informative, explicitly disabled checkout, administrative access, verification/photo upload, and support states.
-- Safety, community guidelines, draft terms/privacy/refund policies, and real HTTP 404 responses.
-- Semantic landmarks, keyboard focus, labelled controls, native dialog/FAQ behavior, reduced-motion support, and contrast adjustments.
+Saathlumi is pronounced “saath-loo-mee”. An exact-name web search on 2026-09-10 returned no indexed matches: https://www.google.com/search?q=%22Saathlumi%22. This is not a uniqueness guarantee or trademark clearance. Domains, social handles, similar-name conflicts, trademarks, and company names have not been verified or reserved.
 
-## Backend foundation
+Legacy internal identifiers (`togetherly-db`, `__Host-togetherly`, calendar UID namespace) remain unchanged to preserve data, sessions, and calendar identity.
 
-### Accounts and privacy
+## Completed features
 
-- D1 users, salted PBKDF2-SHA256 password hashes, hashed random session tokens, 7-day `__Host-` Secure/HttpOnly/SameSite=Lax cookies.
-- Minimum 12-character passwords. **Current PBKDF2 work factor is 100,000 to fit the Workers Web Crypto limit; replace with a reviewed managed-auth or suitable memory-hard solution before a public launch.** This is not a security certification.
-- Validated adult date of birth, versioned policy consents, private-by-default profiles, account and companion roles.
-- Email confirmation is separate from adult/identity verification. No identity badge is fabricated.
-- Resend email adapter, hashed expiring single-use verification/reset tokens, session invalidation on password reset.
-- Verification token tests use privileged local fixtures, not a public bypass. Email sending is unavailable until configured.
-- Parameterized queries, origin checks for browser mutations, request body limits, D1-backed rate limits, CSP, security headers, redacted error logs, private API responses marked no-store.
-- Rate limits currently share a hashed IP bucket; a production design should add distributed account-level abuse controls, CAPTCHA/Turnstile as appropriate, and retention cleanup.
+### Photo-free, private interface
 
-### Membership
+- Responsive ivory/plum/coral homepage with a clearly labelled invitation illustration made from text, CSS, and inline vector icons. No photos or person illustrations.
+- Removed all five previously used photo files from public assets and build output. Old sample-profile URLs and photo URLs return 404.
+- Removed fictional names, biographies, and the sample-profile data array from the browser bundle.
+- `GET /api/companions` always returns an empty directory, regardless of profile approval or authentication.
+- No new direct bookings to arbitrary member IDs. `/api/bookings` POST is closed; use private interests instead.
+- Private plan form: city, activity, date/time in IST, 60/90/120-minute duration, and explicit sharing consent. No exact venue, personal message, photo, or contact field is broadcast.
+- Private account dashboard, notification badge/inbox, notification preferences, own-interest list/cancellation, account details, data export, and deletion requests.
+- Calendar explorer, clear safety guidance, FAQs, draft policies, and explicitly disabled payment/admin/support states.
+- Prior request preserved: no public “free for women” promotion or anonymous API female-rate disclosure. Underlying membership rules are unchanged.
 
-- Public presentation no longer advertises free membership for women: the homepage/pricing card, FAQs, and draft terms use account-specific membership wording. The anonymous configuration API omits the female rate. Existing membership rules and private signed-in checkout details remain unchanged.
-- D1 `settings` supplies male amount 29900 paise and female amount 0.
-- Women receive active free membership; men have an inactive membership until a verified capture; self-described/undisclosed genders receive `pending-policy`.
-- Registration is free for everyone. ₹299 is a one-time platform fee, not a meeting charge, recurring subscription, or guarantee of consent.
-- No companion payouts, separate companion charges, or cancellation fees are configured.
+### Private in-app notification flow
 
-### Booking and messaging APIs
+1. An authenticated member chooses a supported city and activities at `/notifications`. New invitations are off by default. A checked opt-in box and Save are required to enable them.
+2. A sender with confirmed email, verified adulthood, and active membership submits a private plan at `/browse`. It must be at least one hour ahead and within 90 days.
+3. A D1 trigger atomically selects up to 20 matching opted-in, eligible members in that city/activity. It excludes the sender, blocked pairs, suspended accounts, and pending deletion requests.
+4. A second trigger creates persistent in-app invitations. Only city, activity, time, and duration are returned to recipients. Names, emails, dates of birth, photos, user IDs, matching-member counts, and exact locations are not included.
+5. A recipient may show interest or decline. Only their own pending invitation can be answered; a conditional update and unique notification index prevent concurrent duplicate replies.
+6. Showing interest creates one anonymous in-app reply for the plan owner. Declining does not notify the owner. Neither response reveals identity, opens chat, or confirms a meeting.
+7. Members can mark alerts as read, block another member through an opaque invitation ID, pause new invitations, or cancel their own interest. Cancelled/expired plans, blocked pairs, revoked eligibility, and pending deletion are excluded from the active inbox.
 
-The APIs exist and are integration-tested with isolated local fixtures. The browser deliberately uses sample profiles rather than exposing an unfinished live marketplace.
+The inbox refreshes every 30 seconds while the tab is visible, and can be refreshed manually. Alerts are stored in D1 and appear after reload/login; there are no fabricated notifications. Delivery is **in-app only**. Email, SMS, WhatsApp, browser push, and background notifications are not implemented. Configuring transactional email for authentication does not enable invitation emails.
 
-- Booking creation requires email/adult verification and active membership, a visible approved companion, published availability, no block, a future slot, and 60/90/120-minute duration.
-- Recurring availability/blocked-day schema, UTC timestamps, Asia/Kolkata conversion, minimum notice, 30-minute buffers.
-- D1 triggers atomically prevent overlapping accepted bookings for either participant, including when a person switches requester/companion roles.
-- Pending/accepted/declined/cancelled/expired/completed/no-show transitions; only companions may accept/decline; completion/no-show requires the meeting to have ended.
-- Pending expiry catches up on incoming member booking requests; no unsupported scheduler.
-- Reschedule proposals require the other participant’s acceptance. Accepted bookings export `.ics` with UTC times.
-- Persisted messages restricted to eligible participants of accepted/completed bookings. Third-party access and blocked interactions are denied.
-- Reporting, blocking (also cancels active plans), and completed-booking review eligibility APIs.
-- No staffed report handling, delivery notifications, complete messaging UI, availability publishing UI/API, or live booking management UI yet.
+Matching happens at plan creation, not retroactively when someone later opts in. Pausing notifications stops new invitations; existing valid invitations remain visible. An interest is not a time reservation: mutual meeting confirmation, identity-disclosure consent, and downstream booking flow remain future work.
 
-### Razorpay integration foundation
+“Private” means not publicly listed or disclosed to other members in invitations. The platform still stores account information and matching relationships; authorized operators may access data as required. No claim of end-to-end encryption or anonymity from the platform is made.
 
-- Server-side order creation, server-derived amount, checkout HMAC validation, raw-body webhook HMAC validation, exact order/member/amount/currency matching, and provider-side payment lookup.
-- `created`/authorized states do not activate access; only captured payments can.
-- Event IDs deduplicate webhook delivery. SQL preserves terminal refund/dispute states during out-of-order processing; revoked membership cannot be automatically reactivated.
-- Full refunds/disputes revoke paid membership. Partial refunds retain current captured state and require a reviewed final policy. Closed disputes remain revoked pending manual review.
-- Unique pending-order constraint prevents storing multiple payable current orders; provider-side order-creation races/orphan reconciliation still need a production review.
-- Payment history endpoint exists. Refund execution, receipts/invoices, dispute appeals, administrator review and Razorpay Checkout browser integration are not implemented.
-- **Checkout stays disabled in the browser even if secrets are added. Do not enable payments by merely setting environment variables.** Complete the missing UI, tax decisions, provider tests and operations first.
-- No real provider transaction, refund or delivery has been executed during testing.
+### Account and security foundation
 
-## Entry points
+- D1 persistence; parameterized SQL, validation, body-size limits, origin checks, rate limits, private API `no-store`, CSP/security headers, redacted operational error logs.
+- Salted PBKDF2-SHA256 hashes and hashed random session tokens. `__Host-` Secure/HttpOnly/SameSite=Lax cookies expire after seven days.
+- Passwords must be at least 12 characters. **The current PBKDF2 work factor is 100,000 to fit Workers Web Crypto constraints; adopt a reviewed managed-auth or suitable memory-hard solution before public launch.** This is not a security certification.
+- Declared age checks, consent records, separate email/adult-verification status, private account information and role records. Declared age is not proof of adulthood.
+- Resend adapter for email confirmation/password reset, expiring single-use hashed tokens, and session revocation after password reset. Delivery requires configured credentials/domain.
+- Account deletion requests immediately hide profiles, disable invitation preferences, cancel owned private interests, and remove their matches from active inboxes. Actual deletion/retention processing requires operators and a final policy.
+- Data export includes own account/profile/consents/payments, private preferences/plans, and notification texts, without passwords/session secrets or other members’ identities from private matching.
 
-| Page | Purpose / parameters |
+### Existing booking/payment foundations
+
+Existing authenticated legacy-booking functionality is retained for compatibility: state transitions, rescheduling with mutual acceptance, UTC `.ics` exports, availability rules, D1 overlap/buffer triggers, restricted messages, reviews, blocking/report APIs. Tests seed legacy fixtures directly. **New direct bookings are disabled; these APIs are not an implemented continuation of the private-interest flow.**
+
+Membership rules remain: women have free platform membership; men require the proposed ₹299 one-time payment; self-described/undisclosed genders are pending an owner policy. Public marketing does not advertise the women’s rate. Pricing requires legal/provider review. ₹299 is not a per-meeting fee, recurring subscription, payout to a companion, or consent guarantee.
+
+Razorpay foundation: server-created orders; server-derived amount; HMAC verification of checkout and raw-body webhooks; exact user/order/amount/currency checks; provider lookup; event deduplication; terminal refund/dispute protection; paid access only on capture. Full refunds/disputes revoke paid membership; partial refunds and dispute appeals require final policy/review. No real payment/provider test was performed. Checkout UI is deliberately disabled even if secrets are added. SDK integration, receipts, refund execution, administrator MFA/review, and real provider end-to-end tests are still missing.
+
+## Pages and APIs
+
+| Route | Purpose |
 | --- | --- |
-| `/` | Marketing homepage; `#faq` and section anchors |
-| `/browse` | Preview filters: `city`, `activity`, `gender`, `language`, `q`, `date` |
-| `/companions/ananya`, `/companions/arjun`, `/companions/meera` | Fictional examples and calendar/request previews |
-| `/how-it-works`, `/pricing`, `/safety` | Public explanation pages |
-| `/register` | Optional `gender=woman/man`, `role=companion` |
-| `/login`, `/forgot-password` | Account flows |
-| `/verify-email?token=…`, `/reset-password?token=…` | Single-use emailed token flows |
-| `/dashboard`, `/onboarding` | Account overview and private profile editing |
-| `/calendar`, `/availability` | Sample calendar, not availability publishing |
-| `/messages` | Account-gated messaging empty state |
-| `/checkout`, `/payment-result` | Explicitly unavailable payment UI |
-| `/admin` | Fail-closed administrator access state |
-| `/contact` | Support setup status and emergency guidance |
-| `/terms`, `/privacy`, `/refunds`, `/guidelines` | Draft policies/community rules |
+| `/` | Photo-free homepage; `#faq` |
+| `/browse?city=&activity=&date=` | Private-interest form; sending requires login/eligibility |
+| `/notifications` | Authenticated preferences and personal inbox |
+| `/dashboard` | Private dashboard, own interests, unread alerts |
+| `/onboarding` | Private account details; no photo upload |
+| `/calendar`, `/availability` | Date explorer, not published member availability |
+| `/register`, `/login`, `/forgot-password` | Account flows |
+| `/verify-email?token=`, `/reset-password?token=` | Single-use emailed token flows |
+| `/how-it-works`, `/pricing`, `/safety` | Public explanation |
+| `/messages` | Account-gated informational state; private interest does not create chat |
+| `/checkout`, `/payment-result`, `/admin`, `/contact` | Explicitly unavailable operational features |
+| `/terms`, `/privacy`, `/refunds`, `/guidelines` | Draft policies and community guidelines |
+| `/companions/:id` | 404; no public member pages |
 
 API base `/api`:
 
-- `GET /health`, `/config`, `/auth/me`, `/companions?city=&limit=&offset=`.
-- `POST /auth/register`, `/auth/login`, `/auth/logout`, `/auth/resend`, `/auth/verify`, `/auth/forgot`, `/auth/reset`.
-- Authenticated `GET/PUT /profile`; `GET /account/export`; `POST /account/deletion`.
-- `GET/POST /bookings`; `POST /bookings/:id/status`, `/bookings/:id/reschedule`; `GET /bookings/:id/calendar.ics`.
-- `GET/POST /conversations/:id/messages`; `POST /blocks`, `/reports`, `/reviews`.
-- Gated `POST /payments/order`, `/payments/verify`, `/payments/webhook`; authenticated `GET /payments/history`.
-- `/admin/*` denies access until provisioning/MFA/administration is implemented. Application roles and data authorization are distinct from any future hosting route-admission rules.
+- Public: `GET /health`, `/config`; `GET /companions` returns no people.
+- Account: `GET /auth/me`; `POST /auth/register`, `/auth/login`, `/auth/logout`, `/auth/resend`, `/auth/verify`, `/auth/forgot`, `/auth/reset`.
+- Authenticated account data: `GET/PUT /profile`, `GET /account/export`, `POST /account/deletion`.
+- Private notification preferences: `GET/PUT /notification-preferences`.
+- Private plans: `GET/POST /private-plans`, `POST /private-plans/:id/cancel`.
+- Inbox: `GET /notifications`, `POST /notifications/:id/read`.
+- Anonymous invitation actions: `POST /private-invitations/:id/respond` with `response=interested|declined`; `POST /private-invitations/:id/block`.
+- Legacy authorized bookings/messages: `GET /bookings`, `POST /bookings/:id/status`, `/bookings/:id/reschedule`, `GET /bookings/:id/calendar.ics`, `GET/POST /conversations/:id/messages`. New `POST /bookings` is closed (410 after eligibility checks).
+- Existing APIs: `POST /blocks`, `/reports`, `/reviews`; gated `POST /payments/order`, `/payments/verify`, `/payments/webhook`; authenticated `GET /payments/history`.
+- `/admin/*` fails closed until administrator provisioning/MFA and management workflows exist.
 
-API data is always authorized server-side. Page redirects and empty states are not security boundaries.
+All record authorization is server-side. Browser gates are informational, not security boundaries. These per-member rules are separate from any future hosting route-admission policy.
 
-## Data architecture
+## Data and migrations
 
-`migrations/0001_initial.sql` creates users, profiles, roles, consent_records, verification_records, sessions, auth_tokens, rate_limits, settings, memberships, availability_rules, availability_exceptions, bookings, conversations, messages, payment_orders, payments, webhook_events, reviews, reports, blocks, notifications, admin_audit_logs, and deletion_requests.
+- `0001_initial.sql`: users/profiles/roles/consents, sessions/auth tokens, memberships/settings, availability/bookings/messages, payments/webhooks, blocks/reports/reviews/notifications, audits and deletion requests.
+- `0002_private_connections.sql`: hides existing profiles; adds notification_preferences, private_plans, private_invitations; adds notification-invitation foreign key and deduplication/indexes; creates atomic matching and notification triggers.
+- Existing sessions/data are preserved. No destructive database reset is required.
+- D1 is the only runtime persistence. No runtime filesystem or in-memory database, KV, cron, WebSocket server, or long-running server task is used.
+- No R2 bucket or photo uploads. No photographs ship in public assets. Branding uses CSS and inline SVG icons; fonts are from Google Fonts (DM Sans/Manrope).
+- Build uses Hono’s `emptyOutDir: true` so removed public assets do not survive in `dist`.
 
-D1 persists account/business data. No R2 bucket is provisioned; image uploads and ID-document uploads are disabled. Public illustrative images are packaged static assets. Form selections and booking-preview state are ephemeral browser state, not real bookings.
-
-## Setup and preview
+## Setup
 
 ```sh
 cd /home/user/webapp
 npm ci
 npm run db:migrate:local
 npm run build
-# Clear an existing preview before starting (or stop its PM2 process first).
 fuser -k 3000/tcp 2>/dev/null || true
 pm2 start ecosystem.config.cjs
 curl http://localhost:3000/api/health
 pm2 logs webapp --nostream
 ```
 
-Wrangler has a deliberately local placeholder D1 ID (`00000000-0000-0000-0000-000000000001`). It must be replaced/provisioned through the chosen hosting workflow for production. Do not apply local test fixtures to a remote database.
+Wrangler’s D1 ID is a local placeholder (`00000000-0000-0000-0000-000000000001`). Provision the real production database through the selected hosting path before deployment. Do not migrate fixture data to production. Clean builds can invalidate Wrangler’s watched asset manifest. Stop the PM2 preview before rebuilding, then restart it with `pm2 start ecosystem.config.cjs`. Verify `/static/app.js` returns 200 and a removed photo URL returns 404 before testing.
 
-Use test details and a unique test password in this development preview. Create an account to edit your private profile. Email/adult verification gates prevent live meetings. Browse samples without an account; selecting a date/time and filling the form opens a clearly marked request preview, not a booking.
+Use test details and a unique test password. Register, open Notifications, choose city/activities, opt in, and save. Preferences persist immediately; sending/receiving matching interests additionally requires genuine email/adult verification and membership. No public verification bypass exists. Automated tests use isolated SQL fixtures and clean them up.
 
-### Email configuration
+### External services
 
-Copy `.dev.vars.example` to `.dev.vars` locally and configure `APP_ORIGIN`, `EMAIL_API_KEY` (Resend), and `EMAIL_FROM` with a verified sending domain. Never commit credentials. Set production secrets through the selected deployment platform. Validate sending-domain SPF/DKIM/DMARC, consent copy, callback origins, delivery, expiry, reuse, and failure handling before launch. Optional phone OTP is not implemented.
+Copy `.dev.vars.example` to ignored `.dev.vars` for local secrets. Configure `APP_ORIGIN`, `EMAIL_API_KEY` (Resend), and `EMAIL_FROM` for authentication mail using a verified domain; validate SPF/DKIM/DMARC, delivery and token flows. Never expose or commit secrets. Production secrets must be set through the selected hosting platform. Optional phone OTP and invitation-email delivery are not implemented.
 
-### Payment setup checklist
+Razorpay launch sequence:
+1. Obtain approval for the actual business category and finalize entity/tax/refund/consumer-support details.
+2. Complete checkout SDK/CSP, invoices/receipts, reconciliation/refund UI and MFA-protected administration.
+3. Configure test-only `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`; webhook URL is `https://YOUR_DOMAIN/api/payments/webhook`.
+4. Run provider sandbox captures/failures/refunds/disputes, tampering, duplicates, concurrency and out-of-order delivery.
+5. Set pricing/tax approvals and `PAYMENTS_ENABLED` only after review. This alone does not enable the unfinished browser checkout.
+6. Use live secrets only after launch approval; never store raw card data or trust only a frontend callback.
 
-1. Obtain Razorpay merchant approval for the actual platonic-companionship business category.
-2. Finalize legal entity, gender-pricing policy, tax inclusion/registration, refunds, chargebacks, and customer support details.
-3. Complete checkout SDK UI and narrow CSP integration, receipts, reconciliation, admin MFA/refunds, and operational monitoring.
-4. Use Razorpay test-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and a distinct `RAZORPAY_WEBHOOK_SECRET`; keep them server-side.
-5. Configure webhook target `https://YOUR_APPROVED_DOMAIN/api/payments/webhook`. Test captured/failed/refund/dispute events with Razorpay’s real sandbox, including invalid signatures, duplicates and concurrent/out-of-order events.
-6. Only after review, configure D1 `tax_configured` and `pricing_approved`, then `PAYMENTS_ENABLED`. This does not itself enable the unfinished checkout UI.
-7. Use live secrets only after launch approval. Never store card details or trust a frontend callback alone.
+## Tests
 
-## Tests and results
+- `npm test`: 33 API integration tests, including opt-in/out, private matching, no identity/member-count disclosure, unread state, cross-account access, atomic duplicate replies, revoked eligibility, declines, cancellation, blocks, account flows and legacy bookings.
+- `npm run test:browser`: 43 desktop/mobile checks (1440px and 390px), including no photos, dead old photo/profile URLs, real D1 preferences/inbox, interested response, anonymous blocking, private plan creation and cancellation.
+- `npm run test:db`: 10 isolated schema/constraint tests apply all migrations.
+- `npm run test:payments`: 10 local payment signature/state tests.
+- `node tests/accessibility.test.mjs`: automated axe WCAG 2 A/AA checks on 8 routes. This is not a full accessibility certification.
+- `npm run build`: Worker approximately 22 KB gzipped.
 
-Validated in the local preview:
+Playwright setup: `npx playwright install chromium` plus OS dependencies on a fresh Linux host. Screenshots live in ignored `tests/artifacts/`. Fixture integration tests only run against localhost and clean their test records. Repeated runs may legitimately hit rate limits. Never weaken production eligibility or abuse controls for testing.
 
-| Suite | Result |
-| --- | --- |
-| `npm test` | 23 API integration tests passed |
-| `npm run test:db` | 10 isolated migration/constraint tests passed |
-| `npm run test:payments` | 10 signature/payment-state unit tests passed |
-| `npm run test:browser` | 29 desktop/mobile browser checks passed (1440px and 390px) |
-| `node tests/accessibility.test.mjs` | 8 pages passed automated axe WCAG 2 A/AA checks |
-| `npm run build` | Passed; approximately 20 KB gzipped Worker |
-| `npm audit` | 0 known vulnerabilities at final check |
+Provider delivery, identity verification, live payments, load/penetration tests, manual screen-reader checks, and production operations are not certified by these tests. The dev-only `sharp` dependency is overridden to a patched release; check compatibility/security when upgrading dependencies.
 
-Browser dependencies: `npx playwright install chromium`; on fresh Linux hosts also install Playwright OS dependencies. Screenshots are saved under ignored `tests/artifacts/`.
+## Remaining launch requirements
 
-API fixture tests are explicitly restricted to localhost, create temporary verified test accounts with SQL, and clean them up. Repeated runs can correctly hit rate limits; use a fresh local test database or allow the configured window to expire. Never disable production rate limits for tests.
+- Select managed hosting or the owner’s Cloudflare account; provision actual D1 and production secrets. Nothing has been production-deployed.
+- Implement genuine adult verification and configure/validate email delivery. Keep all real matching gated until ready.
+- Design mutual confirmation and optional identity/contact disclosure with explicit consent; connect private interests to safe, conflict-free bookings without restoring public profiles.
+- Decide whether invitation email/push is desired; implement minimal-content opt-in delivery and retries separately. In-app alerts do not reach a closed browser.
+- Administrator provisioning, MFA, moderation, anonymous-invitation reporting workflow, appeals, suspensions, payment refunds, staff/support contacts and response procedures.
+- Harden authentication/password storage, account-level abuse controls, row authorization, rate-limit cleanup, session/token retention, and notifications/privacy retention.
+- Review the 20-recipient cap, matching fairness and request-time delivery model before scale. Do not expose recipient counts or retroactively notify without a defined consent policy.
+- Legal approval of gender-based pricing and pricing for other identities; provider approval, taxes and membership/refund policies. Do not infer gender from images.
+- Final legal entity, privacy policy, consent versions, retention/deletion timelines, grievance/support contacts and statutory financial retention exceptions.
+- Monitoring/alerts, migration and recovery drills, backups, security/accessibility/performance audits. Do not advertise 24/7 support or emergency monitoring.
+- Enable marketing SEO only when launched; preview is intentionally noindex/robots-disallowed and private pages must remain unindexed.
 
-Payment unit tests verify local signature/state rules and database tests cover webhook uniqueness; **they are not a claim that Razorpay transport, refunds, email delivery, identity verification, or full production concurrency has been certified**. Real provider end-to-end tests, load tests, manual screen-reader checks, penetration testing, and operational exercises remain required. Automated axe results are not an accessibility certification.
+## Backup and rollback
 
-The development-only `sharp` transitive dependency is overridden to a patched release to resolve an audit finding. Revalidate Wrangler compatibility when updating dependencies.
-
-## Production-readiness checklist / next steps
-
-- [x] Responsive public design and clearly separated fictional samples.
-- [x] D1 schema, account persistence, private profiles, secure-cookie sessions, token lifecycle, input/origin checks.
-- [x] Server-side booking/messaging foundation and atomic overlap protection.
-- [x] Payment signature/state foundation with checkout fail-closed.
-- [x] Automated tests, environment template, source control, preview.
-- [ ] Choose Genspark-managed hosting or the owner’s Cloudflare account; provision actual production D1 and, if uploads are added, R2. No production deployment has occurred.
-- [ ] Implement and validate a genuine adult-verification provider; keep profiles unpublished until passed.
-- [ ] Administrator provisioning, MFA, fine-grained moderator permissions, review/moderation console, refund confirmation, audit workflows and appeals.
-- [ ] Replace fictional discovery with approved real profiles; connect full booking management, real availability publishing, inbox/polling, notifications, block/report controls, review display and pagination to APIs. Remove samples from production entirely.
-- [ ] Harden authentication against current password-storage recommendations and production resource constraints. Review concurrent eligibility/block/payment transitions, session cleanup and token retention.
-- [ ] Profile photo upload validation, R2 storage, moderation and privacy; no raw identity-document upload unless essential and reviewed.
-- [ ] Razorpay SDK/merchant approval, tax handling, live payment tests, receipts, refunds and chargeback operations.
-- [ ] Email domain/provider, deliverability tests and account recovery operations; optional phone provider if wanted.
-- [ ] Decide pricing for self-described/undisclosed gender, review gender-based pricing legally and with payment provider. Do not infer gender from photos/IDs or silently choose a charge.
-- [ ] Final legal terms, consent versions, privacy purposes, retention periods, owner/grievance contacts, cancellation/refund policy, deletion turnaround, financial retention exceptions.
-- [ ] Staff safety escalation, report review, member support and appeals. Do not claim 24/7 support or emergency monitoring.
-- [ ] Error monitoring/alerts, backup/restore drills, rollback procedure, rate-limit cleanup, production load/security/accessibility review.
-- [ ] Real marketing SEO only after launch. Preview intentionally uses noindex and robots disallow; private account pages must remain excluded.
-
-## Backup, migration, and rollback plan
-
-Version migrations in git. Before each production migration, use the chosen platform’s D1 export/backup or time-travel facility and retain the schema version and deployment commit. Validate a restore into a separate staging database and run smoke tests before relying on the backup. Keep exports outside public assets and out of git; they may contain personal data. Apply forward-compatible migrations before changing application code. Roll back application code to a compatible commit; restore a database only with a reviewed reconciliation/data-loss plan. No destructive automated reset or restore has been provided or executed. Define final recovery-point/recovery-time objectives with the owner before launch.
-
-## Image provenance
-
-Images were retrieved through the provided Creative-Commons/public-domain-filtered image search and stored locally. No commercial-stock crawler extraction was used. Source references:
-
-- `coffee-friends.jpg`: https://www.pickpik.com/beard-beverage-break-business-cafe-coffee-45390 — lifestyle illustration, not members.
-- `sample-ananya.jpg`: https://easy-peasy.ai/ai-image-generator/images/hyper-realistic-portrait-smiling-south-asian-individual — AI illustrative sample.
-- `sample-arjun.jpg`: https://pxhere.com/en/photo/1365479 — illustrative sample.
-- `sample-meera.jpg`: https://www.pickpik.com/girl-madagascar-africa-woman-young-smole-115863 — illustrative sample.
-- `community.jpg`: https://easy-peasy.ai/ai-image-generator/images/diverse-group-lively-conversation-cafe-scene — AI lifestyle illustration.
-
-All sample identities and bios are fictional; do not imply depicted people endorse the business or offer companionship. Reconfirm source license terms and any model/personality permissions needed for the final commercial campaign. Typography is served from Google Fonts (DM Sans and Manrope); self-host fonts if your final privacy policy requires it.
+Version migrations in git. Back up D1 using the selected platform’s export/time-travel facility before production migrations, and test restoration into a separate staging database. Store exports privately, outside public assets/git. Use forward-compatible migrations and roll back application code only to a compatible version. Database restoration requires a reviewed reconciliation/data-loss plan and defined recovery targets. No destructive restore or reset was executed. Historical source backups may contain the removed illustrative assets; the current built website and public source assets no longer contain them.
