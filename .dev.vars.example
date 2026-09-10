@@ -1,7 +1,7 @@
 # Copy to .dev.vars; never commit real secrets.
 APP_ORIGIN=https://your-approved-domain.example
 EMAIL_API_KEY=
-EMAIL_FROM=Togetherly <hello@your-approved-domain.example>
+EMAIL_FROM=Saathlumi <hello@your-approved-domain.example>
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=

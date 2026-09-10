@@ -1,6 +1,12 @@
-# Togetherly
+# Saathlumi
 
 An adults-only, strictly platonic companion-booking application for India. Warm ivory, deep plum, coral accents, and an editorial, responsive interface.
+
+## Name and availability
+
+The public-facing working name is **Saathlumi** (saath-loo-mee). An exact-name web search on 2026-09-10 returned no indexed matches: https://www.google.com/search?q=%22Saathlumi%22. This is a preliminary search, not a guarantee of uniqueness or legal clearance. Domain registration, social handles, Indian and international trademarks, phonetic/similar-name conflicts, and company-name availability have not been verified or reserved.
+
+Legacy internal identifiers (`togetherly-db`, `__Host-togetherly`, and calendar event UID namespaces) are intentionally unchanged to preserve existing data, sessions, and calendar identity. They are not public branding. Membership rules and the removal of public free-for-women messaging are unchanged.
 
 ## Current status
 
