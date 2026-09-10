@@ -8,14 +8,14 @@ app.use('*', async (c, next) => {
  c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
  c.header('X-Frame-Options', 'DENY')
  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
- c.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
+ c.header('Content-Security-Policy', "default-src 'self'; script-src 'self' https://sdk.cashfree.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.cashfree.com; frame-src https://*.cashfree.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
  await next()
 })
 app.route('/api', api)
 app.use('/static/*', serveStatic({ root: './public' }))
 const shell = `<!DOCTYPE html>
 <html lang="en-IN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#fdfbf7"><title>Saathlumi — Good company. Meaningful moments.</title><meta name="description" content="A little good company goes a long way. Saathlumi connects adults through private, platonic meeting interests and opt-in in-app invitations. No photos or public profiles. Preview mode."><meta name="robots" content="noindex, nofollow"><meta property="og:title" content="Saathlumi — Good company. Meaningful moments."><meta property="og:description" content="Find your kind of company. Strictly platonic, always respectful. Explore the Saathlumi preview."><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head><body><a class="skip-link" href="#app">Skip to content</a><div id="app" tabindex="-1"></div><noscript><main><h1>Saathlumi</h1><p>Good company. Meaningful moments.</p><p>Please enable JavaScript to explore our adults-only, strictly platonic companion-booking preview. Payments and live bookings are not available.</p></main></noscript><dialog id="app-dialog" aria-label="Saathlumi private action"></dialog><div id="toast" role="status" aria-live="polite"></div></body></html>`
-const routes = ['/', '/browse', '/how-it-works', '/safety', '/pricing', '/register', '/login', '/forgot-password', '/reset-password', '/verify-email', '/dashboard', '/onboarding', '/calendar', '/availability', '/notifications', '/messages', '/checkout', '/payment-result', '/contact', '/terms', '/privacy', '/refunds', '/guidelines', '/admin']
+const routes = ['/', '/browse', '/how-it-works', '/safety', '/pricing', '/register', '/login', '/forgot-password', '/reset-password', '/verify-email', '/dashboard', '/onboarding', '/verification', '/calendar', '/availability', '/notifications', '/messages', '/checkout', '/payment-result', '/contact', '/terms', '/privacy', '/refunds', '/guidelines', '/admin']
 for (const route of routes) app.get(route, c => c.html(shell))
 app.get('/companions/:id', c => c.html(shell, 404))
 app.get('/robots.txt', c => c.text('User-agent: *\nDisallow: /\n'))

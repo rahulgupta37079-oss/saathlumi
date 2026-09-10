@@ -2,8 +2,14 @@
 APP_ORIGIN=https://your-approved-domain.example
 EMAIL_API_KEY=
 EMAIL_FROM=Saathlumi <hello@your-approved-domain.example>
+# Use NEW sandbox keys only. Rotate any keys shared in screenshots/chat.
+CASHFREE_APP_ID=
+CASHFREE_SECRET_KEY=
+CASHFREE_ENV=sandbox
+CASHFREE_SANDBOX_ENABLED=false
+# Production checkout and verification collection are not implemented/enabled.
+# Existing Razorpay routes remain legacy and unconfigured.
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=
-# Leave false until all operational, tax, merchant and legal checks pass.
 PAYMENTS_ENABLED=false

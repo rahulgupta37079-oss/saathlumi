@@ -1,170 +1,210 @@
 # Saathlumi
 
-A photo-free, adults-only platform for private, strictly platonic meeting interests in India. Members do not browse a public directory. They choose interests, opt in to private in-app invitations, and decide whether to respond.
+An adults-only, private, strictly platonic meeting-interest platform for India. No public photos or member directory. Members choose interests, opt in to in-app invitations, and decide whether to respond.
 
-## Status and URLs
+## Current status
 
-**Development preview; not production-ready.** Accounts, private preferences, meeting-interest creation, in-app invitations/responses, and privacy controls are implemented. Live matching is gated by email confirmation, adult verification, and active membership. Adult verification is not configured; no fake matches or users are presented. Payments, meeting confirmation, and staffed moderation are not operational.
+**Development preview; not production-ready.** Private account/notification flows are implemented. Cashfree **sandbox-only** checkout is implemented but remains disabled until fresh sandbox secrets and a whitelisted HTTPS origin are configured. No actual Cashfree transaction has been processed during development.
+
+Private verification requirements are implemented: age verification and selfie/liveness for everyone; an ID check for men using masked Aadhaar or a viable alternative. **Document and selfie collection and provider verification are not implemented/enabled.** No image upload can mark an account verified. Live matching stays gated until all required verification results and membership conditions are met.
 
 - Preview: https://3000-in1a4e08bsgdp4voh3kqb-18e660f9.sandbox.novita.ai
-- Local preview: http://localhost:3000
+- Local: http://localhost:3000
 - Health: `/api/health`
-- Production: not deployed. The sandbox URL is temporary.
+- Production: not deployed; the sandbox URL is temporary.
 - Source: `/home/user/webapp`, branch `main`.
-- Stack: Hono + TypeScript, Cloudflare Pages/Workers, D1, browser JavaScript/CSS.
+- Stack: Hono/TypeScript, Cloudflare Pages/Workers, D1, browser JavaScript/CSS.
 
-## Name
+## Credential incident and next action
 
-Saathlumi is pronounced “saath-loo-mee”. An exact-name web search on 2026-09-10 returned no indexed matches: https://www.google.com/search?q=%22Saathlumi%22. This is not a uniqueness guarantee or trademark clearance. Domains, social handles, similar-name conflicts, trademarks, and company names have not been verified or reserved.
+A user-provided screenshot showed Cashfree’s Live dashboard and an exposed secret. **Revoke/rotate that key in Cashfree.** Its values were not copied into the project, environment, logs, or test fixtures, and were not used for a provider request. Do not paste replacement keys in chat or publish another screenshot.
 
-Legacy internal identifiers (`togetherly-db`, `__Host-togetherly`, calendar UID namespace) remain unchanged to preserve data, sessions, and calendar identity.
+For testing, switch Cashfree to **Test**, generate fresh sandbox credentials, and configure the server-side variables below using a secure environment/secrets mechanism. A Live key is not a substitute for a sandbox key. Production Cashfree mode is rejected by the current implementation.
 
-## Completed features
+## Name and existing data
 
-### Photo-free, private interface
+Saathlumi is pronounced “saath-loo-mee”. An exact-name web search on 2026-09-10 returned no indexed matches: https://www.google.com/search?q=%22Saathlumi%22. This is not a uniqueness guarantee or trademark clearance. Domain/social/trademark/company-name availability has not been verified or reserved.
 
-- Responsive ivory/plum/coral homepage with a clearly labelled invitation illustration made from text, CSS, and inline vector icons. No photos or person illustrations.
-- Removed all five previously used photo files from public assets and build output. Old sample-profile URLs and photo URLs return 404.
-- Removed fictional names, biographies, and the sample-profile data array from the browser bundle.
-- `GET /api/companions` always returns an empty directory, regardless of profile approval or authentication.
-- No new direct bookings to arbitrary member IDs. `/api/bookings` POST is closed; use private interests instead.
-- Private plan form: city, activity, date/time in IST, 60/90/120-minute duration, and explicit sharing consent. No exact venue, personal message, photo, or contact field is broadcast.
-- Private account dashboard, notification badge/inbox, notification preferences, own-interest list/cancellation, account details, data export, and deletion requests.
-- Calendar explorer, clear safety guidance, FAQs, draft policies, and explicitly disabled payment/admin/support states.
-- Prior request preserved: no public “free for women” promotion or anonymous API female-rate disclosure. Underlying membership rules are unchanged.
+Legacy identifiers (`togetherly-db`, `__Host-togetherly`, calendar UID namespace) remain unchanged to preserve accounts, sessions, and legacy records. Public promotion of free membership for women remains removed. Underlying private membership rules are unchanged.
 
-### Private in-app notification flow
+## Implemented experience
 
-1. An authenticated member chooses a supported city and activities at `/notifications`. New invitations are off by default. A checked opt-in box and Save are required to enable them.
-2. A sender with confirmed email, verified adulthood, and active membership submits a private plan at `/browse`. It must be at least one hour ahead and within 90 days.
-3. A D1 trigger atomically selects up to 20 matching opted-in, eligible members in that city/activity. It excludes the sender, blocked pairs, suspended accounts, and pending deletion requests.
-4. A second trigger creates persistent in-app invitations. Only city, activity, time, and duration are returned to recipients. Names, emails, dates of birth, photos, user IDs, matching-member counts, and exact locations are not included.
-5. A recipient may show interest or decline. Only their own pending invitation can be answered; a conditional update and unique notification index prevent concurrent duplicate replies.
-6. Showing interest creates one anonymous in-app reply for the plan owner. Declining does not notify the owner. Neither response reveals identity, opens chat, or confirms a meeting.
-7. Members can mark alerts as read, block another member through an opaque invitation ID, pause new invitations, or cancel their own interest. Cancelled/expired plans, blocked pairs, revoked eligibility, and pending deletion are excluded from the active inbox.
+### Private, photo-free site
 
-The inbox refreshes every 30 seconds while the tab is visible, and can be refreshed manually. Alerts are stored in D1 and appear after reload/login; there are no fabricated notifications. Delivery is **in-app only**. Email, SMS, WhatsApp, browser push, and background notifications are not implemented. Configuring transactional email for authentication does not enable invitation emails.
+- Responsive ivory/plum/coral homepage, activity choices, FAQs, safety pages, draft policies, and an explicitly illustrative text/vector invitation card.
+- All former photos and fictional person-profile data removed. Old photo and `/companions/:id` URLs return 404; `/api/companions` always returns an empty directory.
+- Private plan form shares only city/activity/proposed time and duration with eligible, opted-in matching members. No exact venue, name, image, contact information, or message is broadcast.
+- Persistent preferences, own-plan list/cancellation, notification inbox and unread badge, interested/declined responses, anonymous invitation blocking, and mark-read.
+- Private account details, registration/login/logout, email confirmation/reset forms, data export and deletion requests.
+- Private `/verification` screens and Cashfree checkout/result/history screens. No public verification-photo gallery or ID upload service.
 
-Matching happens at plan creation, not retroactively when someone later opts in. Pausing notifications stops new invitations; existing valid invitations remain visible. An interest is not a time reservation: mutual meeting confirmation, identity-disclosure consent, and downstream booking flow remain future work.
+### Notification flow
 
-“Private” means not publicly listed or disclosed to other members in invitations. The platform still stores account information and matching relationships; authorized operators may access data as required. No claim of end-to-end encryption or anonymity from the platform is made.
+1. Log in, open `/notifications`, select a city and activities, explicitly opt in and save. Default is off.
+2. A sender must have confirmed email, verified adulthood, verified selfie/liveness, male ID verification where applicable, and active membership.
+3. A private plan must be at least one hour ahead and within 90 days, for 60/90/120 minutes.
+4. D1 triggers atomically select up to 20 matching opted-in eligible recipients. They exclude the sender, blocked pairs, suspended users, and deletion requests. No recipient list or count is returned to the sender.
+5. Recipients get an in-app invitation containing only plan city/activity/time/duration. A single-use conditional response prevents duplicate replies. An interested response notifies the sender anonymously; a decline does not.
+6. Cancellation/expiry, blocked pairs, deleted/suspended accounts and revoked verification/membership remove affected invitations from active inboxes.
 
-### Account and security foundation
+Inbox polling runs every 30 seconds while the tab is visible, with manual refresh available. Notifications persist in D1; none are fabricated. Email/SMS/WhatsApp/push invitation delivery is not implemented. Configuring authentication email does not enable invitation emails. Opting out pauses new invitations; existing valid invitations remain visible. Matching happens on plan creation, not retroactively.
 
-- D1 persistence; parameterized SQL, validation, body-size limits, origin checks, rate limits, private API `no-store`, CSP/security headers, redacted operational error logs.
-- Salted PBKDF2-SHA256 hashes and hashed random session tokens. `__Host-` Secure/HttpOnly/SameSite=Lax cookies expire after seven days.
-- Passwords must be at least 12 characters. **The current PBKDF2 work factor is 100,000 to fit Workers Web Crypto constraints; adopt a reviewed managed-auth or suitable memory-hard solution before public launch.** This is not a security certification.
-- Declared age checks, consent records, separate email/adult-verification status, private account information and role records. Declared age is not proof of adulthood.
-- Resend adapter for email confirmation/password reset, expiring single-use hashed tokens, and session revocation after password reset. Delivery requires configured credentials/domain.
-- Account deletion requests immediately hide profiles, disable invitation preferences, cancel owned private interests, and remove their matches from active inboxes. Actual deletion/retention processing requires operators and a final policy.
-- Data export includes own account/profile/consents/payments, private preferences/plans, and notification texts, without passwords/session secrets or other members’ identities from private matching.
+An interest or reply does not confirm a meeting, disclose identity, reserve a slot, or open chat. Mutual confirmation, consent to optional disclosure, and the downstream private booking flow remain future work.
 
-### Existing booking/payment foundations
+Privacy means no public listing and no automatic identity disclosure to other members. The platform still holds account information and matching relationships. Authorized operators may need access; no end-to-end-encryption or anonymity-from-the-platform claim is made.
 
-Existing authenticated legacy-booking functionality is retained for compatibility: state transitions, rescheduling with mutual acceptance, UTC `.ics` exports, availability rules, D1 overlap/buffer triggers, restricted messages, reviews, blocking/report APIs. Tests seed legacy fixtures directly. **New direct bookings are disabled; these APIs are not an implemented continuation of the private-interest flow.**
+## Private Aadhaar/ID and selfie verification
 
-Membership rules remain: women have free platform membership; men require the proposed ₹299 one-time payment; self-described/undisclosed genders are pending an owner policy. Public marketing does not advertise the women’s rate. Pricing requires legal/provider review. ₹299 is not a per-meeting fee, recurring subscription, payout to a companion, or consent guarantee.
+- `/verification` is account-gated and displays the server-determined requirements.
+- Every gender requires separate adult-age and selfie/liveness verification.
+- Men additionally require ID verification. Masked Aadhaar is one choice; a viable alternative government-ID path must be provided. Aadhaar is not mandatory as the only ID.
+- The upload input and selfie-start control are disabled. `/api/verification/start` and `/api/verification/upload` return 503 without saving files, reading image contents, or changing verification status.
+- No Aadhaar numbers, document copies, selfies or biometric templates are stored. Only result flags exist (`adult_verified`, `selfie_verified`, `id_document_verified`). No public endpoint can set them to verified.
+- New selfie/ID flags default false even for existing accounts. All matching/notification/response eligibility checks enforce them; legacy session/data is preserved.
+- A normal selfie upload is not liveness verification or proof of age. A document image alone is not authentic verification. Provider results must independently establish the required checks.
+- Before enabling collection: select/contract a legitimate verification provider, define explicit consent and purpose, secure hosted collection, signed callbacks, age/document/liveness evidence, masked handling, access controls, retention/deletion, alternative IDs, grievance contacts, and failure/appeal workflows.
+- Prefer hosted provider collection rather than storing ID/selfie files in this application. Keep any verification data private and never pass it to the payment gateway.
 
-Razorpay foundation: server-created orders; server-derived amount; HMAC verification of checkout and raw-body webhooks; exact user/order/amount/currency checks; provider lookup; event deduplication; terminal refund/dispute protection; paid access only on capture. Full refunds/disputes revoke paid membership; partial refunds and dispute appeals require final policy/review. No real payment/provider test was performed. Checkout UI is deliberately disabled even if secrets are added. SDK integration, receipts, refund execution, administrator MFA/review, and real provider end-to-end tests are still missing.
+UIDAI guidance consulted: https://www.pib.gov.in/PressReleasePage.aspx?PRID=1889996 — explicit consent, verification rather than simply accepting a copy, viable alternatives to Aadhaar, and no retention of readable Aadhaar numbers; if retaining a copy is necessary, mask/redact irretrievably. This is implementation guidance, not a legal-compliance certification.
 
-## Pages and APIs
+## Cashfree sandbox integration
+
+Selected provider: **Cashfree Payments**. Older Razorpay foundation endpoints remain unconfigured legacy code, not the selected checkout.
+
+### Configuration
+
+Copy `.dev.vars.example` to ignored `.dev.vars` for local setup, or use the selected hosting platform’s secure secrets mechanism. Never commit real credentials.
+
+```text
+APP_ORIGIN=https://YOUR_APPROVED_HOST
+CASHFREE_APP_ID=<fresh sandbox App ID>
+CASHFREE_SECRET_KEY=<fresh sandbox secret>
+CASHFREE_ENV=sandbox
+CASHFREE_SANDBOX_ENABLED=true
+```
+
+`APP_ORIGIN` must be a trusted HTTPS origin without a trailing slash/path. Whitelist that exact domain in Cashfree. Restart the preview after changing local secrets. Default checkout stays disabled; setting `CASHFREE_ENV=production` is explicitly rejected. `PAYMENTS_ENABLED` does not enable production Cashfree.
+
+### Flow and safeguards
+
+- `/checkout` requires login. Account-specific pricing is shown privately. The paid sandbox path applies to men; other accounts are not silently charged.
+- The server reads the amount from D1 and requires the approved test value 29900 paise. Cashfree receives `order_amount: 299` INR; clients cannot set the amount or currency.
+- A 10-digit customer phone and opaque internal customer ID are sent to Cashfree for checkout. The application does not persist the submitted phone; no account name, email, Aadhaar or selfie is sent by this integration.
+- Reserve a canonical D1 order before provider calls. Parallel retries share a stable order ID and UUID `x-idempotency-key`; provider failures can retry the same order instead of creating duplicates.
+- Orders use `https://sandbox.cashfree.com/pg`, server-only `x-client-id`/`x-client-secret`, and API version `2025-01-01`.
+- Only an authenticated owner receives a payment session. History/export never returns session IDs or credentials.
+- The Cashfree v3 SDK is loaded from `https://sdk.cashfree.com/js/v3/cashfree.js` only after the member starts a configured checkout. It opens redirect checkout with `mode: sandbox`. CSP allows Cashfree SDK/connect/frame domains, not arbitrary external scripts.
+- Return page `/payment-result?order_id=…` asks the backend to fetch the order and payments. A browser redirect, query flag or client success message is never trusted.
+- Exact merchant order, customer ID, amount, currency, order `PAID`, payment `SUCCESS`, and `is_captured: true` are required for a confirmed test payment.
+- Cashfree webhooks are verified using `Base64(HMAC-SHA256(secret, x-webhook-timestamp + rawBody))`. Signature verification precedes JSON parsing. Event bodies are hashed for deduplication, not stored raw.
+- Reconciliation fetches provider state; webhook content alone does not establish payment success. SQL protects paid/review states against stale callbacks. Signed refund/dispute events conservatively enter terminal review; actual refunds are not executed.
+- **Sandbox success never activates real membership or changes any verification flags.** Live checkout, activation, refunds/dispute administration, tax invoices and real provider E2E approval are still outstanding.
+
+Webhook setup: configure `https://YOUR_APPROVED_HOST/api/cashfree/webhook` in Cashfree’s Test dashboard and exercise success/failure/dropped/refund/dispute events. The signing secret is the Cashfree PG sandbox secret. This project was tested with mocked Cashfree responses and real local SQLite/D1, not real merchant transactions or external SDK checkout.
+
+Official references:
+- Hosted checkout: https://www.cashfree.com/docs/payments/online/web
+- Create order: https://www.cashfree.com/docs/api-reference/payments/latest/orders/create-order
+- Get order: https://www.cashfree.com/docs/api-reference/payments/latest/orders/get-order
+- Payments for order: https://www.cashfree.com/docs/api-reference/payments/latest/payments/get-payments-for-an-order
+- Signature verification: https://www.cashfree.com/docs/payments/online/webhooks/signature-verification
+
+## Account/security and legacy foundations
+
+D1 persistence, parameterized SQL, input/body validation, origin checks, D1 rate limits, no-store private responses, CSP/security headers, and redacted operational logs. Cookies are `__Host-`, Secure, HttpOnly, SameSite=Lax, with hashed random session tokens and a seven-day expiry. Expiring hashed email/reset tokens are single-use; password reset revokes sessions.
+
+Passwords require at least 12 characters. **Current PBKDF2-SHA256 work factor is 100,000 to fit Workers Web Crypto constraints. Adopt a reviewed managed-auth or suitable memory-hard solution before public launch.** Existing code is not a security certification.
+
+Resend email confirmation/reset adapters need a verified sending domain and server secrets. Declared DOB is not verification. Deletion requests disable preferences, cancel private interests and hide affected active inbox items; final processing/financial retention requires operators. Exports include own records and verification flags, but no passwords/session secrets or another member’s private identity from matching.
+
+Legacy authorized booking state transitions, rescheduling, `.ics`, availability/overlap/buffer triggers, restricted messages, and review/report APIs remain for compatibility. New direct bookings are closed; these are not yet connected to private-interest confirmation. Tests seed legacy records directly.
+
+Private membership rules remain: women included, men proposed ₹299 one time, other identities pending policy. No public women-free promotion. Legal/provider review is required. Payment does not guarantee consent, affection, acceptance, or a meeting; no companion payouts or separate meeting fees are configured.
+
+## Pages and API entry points
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Photo-free homepage; `#faq` |
-| `/browse?city=&activity=&date=` | Private-interest form; sending requires login/eligibility |
-| `/notifications` | Authenticated preferences and personal inbox |
-| `/dashboard` | Private dashboard, own interests, unread alerts |
-| `/onboarding` | Private account details; no photo upload |
-| `/calendar`, `/availability` | Date explorer, not published member availability |
-| `/register`, `/login`, `/forgot-password` | Account flows |
-| `/verify-email?token=`, `/reset-password?token=` | Single-use emailed token flows |
-| `/how-it-works`, `/pricing`, `/safety` | Public explanation |
-| `/messages` | Account-gated informational state; private interest does not create chat |
-| `/checkout`, `/payment-result`, `/admin`, `/contact` | Explicitly unavailable operational features |
-| `/terms`, `/privacy`, `/refunds`, `/guidelines` | Draft policies and community guidelines |
-| `/companions/:id` | 404; no public member pages |
+| `/` | Public photo-free homepage and FAQs |
+| `/browse?city=&activity=&date=` | Private plan form |
+| `/notifications`, `/dashboard`, `/onboarding` | Personal inbox/preferences, own interests and account details |
+| `/verification` | Private requirements and disabled secure-collection controls |
+| `/checkout` | Account-specific Cashfree sandbox checkout/configuration state |
+| `/payment-result?order_id=` | Server-verified, account-owned test payment result |
+| `/register`, `/login`, `/forgot-password` | Account flows; new registrations continue to verification |
+| `/verify-email?token=`, `/reset-password?token=` | Single-use token flows |
+| `/calendar`, `/availability` | Date explorer, not public member availability |
+| `/how-it-works`, `/pricing`, `/safety` | Public information |
+| `/messages`, `/admin`, `/contact` | Explicitly unavailable operational workflows |
+| `/terms`, `/privacy`, `/refunds`, `/guidelines` | Draft policies |
+| `/companions/:id` | 404; no public person profiles |
 
 API base `/api`:
+- Public `GET /health`, `/config`, `/companions` (empty directory).
+- Account `GET /auth/me`; `POST /auth/register`, `/auth/login`, `/auth/logout`, `/auth/resend`, `/auth/verify`, `/auth/forgot`, `/auth/reset`.
+- Authenticated `GET/PUT /profile`; `GET /account/export`; `POST /account/deletion`.
+- Authenticated `GET /verification/status`; `POST /verification/start` and `/verification/upload` fail closed with 503.
+- Authenticated `GET /cashfree/config`; `GET/POST /cashfree/orders`; `POST /cashfree/orders/:id/verify`.
+- Public but signature-protected `POST /cashfree/webhook` (only bypasses browser-origin check, not authentication of provider data).
+- `GET/PUT /notification-preferences`; `GET/POST /private-plans`; `POST /private-plans/:id/cancel`.
+- `GET /notifications`; `POST /notifications/:id/read`; `POST /private-invitations/:id/respond` (`interested|declined`) and `/block`.
+- Legacy `GET /bookings`; `POST /bookings/:id/status`, `/reschedule`; `GET /bookings/:id/calendar.ics`; `GET/POST /conversations/:id/messages`; `/blocks`, `/reports`, `/reviews`.
+- Legacy unconfigured Razorpay routes `/payments/order`, `/payments/verify`, `/payments/webhook`, `/payments/history`.
+- `/admin/*` remains disabled until administrator provisioning/MFA/management workflows exist.
 
-- Public: `GET /health`, `/config`; `GET /companions` returns no people.
-- Account: `GET /auth/me`; `POST /auth/register`, `/auth/login`, `/auth/logout`, `/auth/resend`, `/auth/verify`, `/auth/forgot`, `/auth/reset`.
-- Authenticated account data: `GET/PUT /profile`, `GET /account/export`, `POST /account/deletion`.
-- Private notification preferences: `GET/PUT /notification-preferences`.
-- Private plans: `GET/POST /private-plans`, `POST /private-plans/:id/cancel`.
-- Inbox: `GET /notifications`, `POST /notifications/:id/read`.
-- Anonymous invitation actions: `POST /private-invitations/:id/respond` with `response=interested|declined`; `POST /private-invitations/:id/block`.
-- Legacy authorized bookings/messages: `GET /bookings`, `POST /bookings/:id/status`, `/bookings/:id/reschedule`, `GET /bookings/:id/calendar.ics`, `GET/POST /conversations/:id/messages`. New `POST /bookings` is closed (410 after eligibility checks).
-- Existing APIs: `POST /blocks`, `/reports`, `/reviews`; gated `POST /payments/order`, `/payments/verify`, `/payments/webhook`; authenticated `GET /payments/history`.
-- `/admin/*` fails closed until administrator provisioning/MFA and management workflows exist.
-
-All record authorization is server-side. Browser gates are informational, not security boundaries. These per-member rules are separate from any future hosting route-admission policy.
+Record authorization is server-side. Browser gates are not security boundaries. Application verification/account authorization is separate from any hosting route-admission or Genspark sign-in policy.
 
 ## Data and migrations
 
-- `0001_initial.sql`: users/profiles/roles/consents, sessions/auth tokens, memberships/settings, availability/bookings/messages, payments/webhooks, blocks/reports/reviews/notifications, audits and deletion requests.
-- `0002_private_connections.sql`: hides existing profiles; adds notification_preferences, private_plans, private_invitations; adds notification-invitation foreign key and deduplication/indexes; creates atomic matching and notification triggers.
-- Existing sessions/data are preserved. No destructive database reset is required.
-- D1 is the only runtime persistence. No runtime filesystem or in-memory database, KV, cron, WebSocket server, or long-running server task is used.
-- No R2 bucket or photo uploads. No photographs ship in public assets. Branding uses CSS and inline SVG icons; fonts are from Google Fonts (DM Sans/Manrope).
-- Build uses Hono’s `emptyOutDir: true` so removed public assets do not survive in `dist`.
+- `0001_initial.sql`: original accounts/auth/consents/memberships, settings, legacy bookings/messages, payments, blocks/reports/reviews/notifications and audits/deletion requests.
+- `0002_private_connections.sql`: hides public profiles, private preferences/plans/invitations, notification indexes and atomic triggers.
+- `0003_cashfree_verification.sql`: selfie/ID result flags, Cashfree orders/events with canonical-open-order constraint, and stricter recipient eligibility trigger.
+- D1 is the only runtime persistence. No runtime filesystem, in-memory database, KV, cron or long-running server. No document/selfie storage or R2 bucket is provisioned.
+- Existing records are preserved. No destructive reset. No photographs ship publicly; styling is CSS/SVG and Google Fonts.
+- Hono build uses `emptyOutDir: true` to remove stale assets.
 
-## Setup
+## Local setup
 
 ```sh
 cd /home/user/webapp
 npm ci
 npm run db:migrate:local
-npm run build
+# Stop an existing PM2 preview before a clean build.
+pm2 stop webapp 2>/dev/null || true
 fuser -k 3000/tcp 2>/dev/null || true
+npm run build
 pm2 start ecosystem.config.cjs
 curl http://localhost:3000/api/health
 pm2 logs webapp --nostream
 ```
 
-Wrangler’s D1 ID is a local placeholder (`00000000-0000-0000-0000-000000000001`). Provision the real production database through the selected hosting path before deployment. Do not migrate fixture data to production. Clean builds can invalidate Wrangler’s watched asset manifest. Stop the PM2 preview before rebuilding, then restart it with `pm2 start ecosystem.config.cjs`. Verify `/static/app.js` returns 200 and a removed photo URL returns 404 before testing.
+Wrangler has a local placeholder D1 ID (`00000000-0000-0000-0000-000000000001`). Production provisioning/deployment requires choosing a hosting path. Do not deploy test fixtures. Restart after clean builds to refresh Wrangler’s asset manifest; verify `/static/app.js` returns 200 and removed photos return 404.
 
-Use test details and a unique test password. Register, open Notifications, choose city/activities, opt in, and save. Preferences persist immediately; sending/receiving matching interests additionally requires genuine email/adult verification and membership. No public verification bypass exists. Automated tests use isolated SQL fixtures and clean them up.
+Use test details and a unique test password. For authentication email, configure `APP_ORIGIN`, `EMAIL_API_KEY` (Resend), `EMAIL_FROM`, sending-domain SPF/DKIM/DMARC, and verify delivery/expiry/failure flows. Invitation emails and optional phone OTP are separate unimplemented features.
 
-### External services
+## Tests and limits
 
-Copy `.dev.vars.example` to ignored `.dev.vars` for local secrets. Configure `APP_ORIGIN`, `EMAIL_API_KEY` (Resend), and `EMAIL_FROM` for authentication mail using a verified domain; validate SPF/DKIM/DMARC, delivery and token flows. Never expose or commit secrets. Production secrets must be set through the selected hosting platform. Optional phone OTP and invitation-email delivery are not implemented.
+- `npm test`: **36** API integration tests, including private verification requirements, no upload-based verification, missing-secret payment gates, private notifications, account isolation and legacy regressions.
+- `npm run test:browser`: **51** desktop/mobile checks, including female/male verification screens, disabled collection, private plans/inbox and unavailable Cashfree checkout without secrets.
+- `npm run test:cashfree`: **13** tests/subtests using a mocked provider and real SQLite. Covers signatures/tampering, canonical parallel order creation, owner/amount/currency checks, false browser-success flags, captured payment, deduplication, review states, and no real membership activation.
+- `npm run test:db`: **10** schema/constraint tests apply all migrations.
+- `npm run test:payments`: **10** legacy payment-rule tests.
+- `node tests/accessibility.test.mjs`: **11** routes passed automated axe WCAG 2 A/AA checks; not a full accessibility certification.
+- Build passes; Worker approximately **25 KB gzipped**. `npm audit`: no known vulnerabilities at final check.
 
-Razorpay launch sequence:
-1. Obtain approval for the actual business category and finalize entity/tax/refund/consumer-support details.
-2. Complete checkout SDK/CSP, invoices/receipts, reconciliation/refund UI and MFA-protected administration.
-3. Configure test-only `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`; webhook URL is `https://YOUR_DOMAIN/api/payments/webhook`.
-4. Run provider sandbox captures/failures/refunds/disputes, tampering, duplicates, concurrency and out-of-order delivery.
-5. Set pricing/tax approvals and `PAYMENTS_ENABLED` only after review. This alone does not enable the unfinished browser checkout.
-6. Use live secrets only after launch approval; never store raw card data or trust only a frontend callback.
+Playwright needs Chromium and Linux libraries (`npx playwright install chromium`). Screenshots are under ignored `tests/artifacts/`. Integration fixtures are local-only and cleaned up. Provider signature/transport/SDK behavior was mocked where secrets are required. No actual document verification, liveness check, external checkout, refund or payment has been claimed. Manual accessibility, provider sandbox E2E, load/penetration tests and production operations remain required.
 
-## Tests
+## Launch blockers
 
-- `npm test`: 33 API integration tests, including opt-in/out, private matching, no identity/member-count disclosure, unread state, cross-account access, atomic duplicate replies, revoked eligibility, declines, cancellation, blocks, account flows and legacy bookings.
-- `npm run test:browser`: 43 desktop/mobile checks (1440px and 390px), including no photos, dead old photo/profile URLs, real D1 preferences/inbox, interested response, anonymous blocking, private plan creation and cancellation.
-- `npm run test:db`: 10 isolated schema/constraint tests apply all migrations.
-- `npm run test:payments`: 10 local payment signature/state tests.
-- `node tests/accessibility.test.mjs`: automated axe WCAG 2 A/AA checks on 8 routes. This is not a full accessibility certification.
-- `npm run build`: Worker approximately 22 KB gzipped.
-
-Playwright setup: `npx playwright install chromium` plus OS dependencies on a fresh Linux host. Screenshots live in ignored `tests/artifacts/`. Fixture integration tests only run against localhost and clean their test records. Repeated runs may legitimately hit rate limits. Never weaken production eligibility or abuse controls for testing.
-
-Provider delivery, identity verification, live payments, load/penetration tests, manual screen-reader checks, and production operations are not certified by these tests. The dev-only `sharp` dependency is overridden to a patched release; check compatibility/security when upgrading dependencies.
-
-## Remaining launch requirements
-
-- Select managed hosting or the owner’s Cloudflare account; provision actual D1 and production secrets. Nothing has been production-deployed.
-- Implement genuine adult verification and configure/validate email delivery. Keep all real matching gated until ready.
-- Design mutual confirmation and optional identity/contact disclosure with explicit consent; connect private interests to safe, conflict-free bookings without restoring public profiles.
-- Decide whether invitation email/push is desired; implement minimal-content opt-in delivery and retries separately. In-app alerts do not reach a closed browser.
-- Administrator provisioning, MFA, moderation, anonymous-invitation reporting workflow, appeals, suspensions, payment refunds, staff/support contacts and response procedures.
-- Harden authentication/password storage, account-level abuse controls, row authorization, rate-limit cleanup, session/token retention, and notifications/privacy retention.
-- Review the 20-recipient cap, matching fairness and request-time delivery model before scale. Do not expose recipient counts or retroactively notify without a defined consent policy.
-- Legal approval of gender-based pricing and pricing for other identities; provider approval, taxes and membership/refund policies. Do not infer gender from images.
-- Final legal entity, privacy policy, consent versions, retention/deletion timelines, grievance/support contacts and statutory financial retention exceptions.
-- Monitoring/alerts, migration and recovery drills, backups, security/accessibility/performance audits. Do not advertise 24/7 support or emergency monitoring.
-- Enable marketing SEO only when launched; preview is intentionally noindex/robots-disallowed and private pages must remain unindexed.
+- Revoke exposed live key. Configure fresh sandbox secrets and a whitelisted domain; exercise Cashfree’s actual sandbox before considering production.
+- Select and contract an approved identity/liveness/age-verification provider. Implement hosted collection, consent, signed result processing, secure evidence/retention and alternate-ID/appeal workflows. Do not accept unmasked Aadhaar or selfies through support/chat.
+- Complete production payment integration/activation, Cashfree merchant approval for the actual business model, taxes, receipts, refunds/disputes and administrator MFA/audit workflows. Sandbox success must remain separate from real access.
+- Legal review of gender-based prices/ID requirements and pricing for other identities, final policies/entity/grievance contacts/retention and statutory financial exceptions.
+- Mutual meeting confirmation, consent-based optional disclosure, conflict-free private booking continuation, staffed moderation/reporting/support and appeals.
+- Harden authentication, distributed abuse controls, token/session/notification retention, monitoring, recovery drills and security review.
+- Choose managed hosting or the owner’s Cloudflare account, provision actual D1/secrets, and approve deployment. No production deploy was performed.
+- No 24/7 support/emergency-monitoring claims. Keep private pages and the preview unindexed.
 
 ## Backup and rollback
 
-Version migrations in git. Back up D1 using the selected platform’s export/time-travel facility before production migrations, and test restoration into a separate staging database. Store exports privately, outside public assets/git. Use forward-compatible migrations and roll back application code only to a compatible version. Database restoration requires a reviewed reconciliation/data-loss plan and defined recovery targets. No destructive restore or reset was executed. Historical source backups may contain the removed illustrative assets; the current built website and public source assets no longer contain them.
+Version migrations in git. Before production migrations, back up D1 using the chosen platform’s export/time-travel facility and test restore into separate staging. Store exports privately, never in public assets/git. Use compatible application rollbacks and reviewed reconciliation/data-loss plans for database recovery. Historical source backups can contain the old illustrative photos; current public assets do not. No destructive restore/reset was executed.
