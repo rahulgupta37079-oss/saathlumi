@@ -69,6 +69,88 @@ api.post('/reviews', auth, async c => { const u = c.get('user'), b = await c.req
 api.get('/account/export', auth, async c => { const u = c.get('user'); const uid = u.id; const queries = ['SELECT display_name,city,area,bio,languages,interests,boundaries FROM profiles WHERE user_id=?', 'SELECT policy,version,accepted_at FROM consent_records WHERE user_id=?', 'SELECT status,source,payment_id FROM memberships WHERE user_id=?', 'SELECT id,amount,currency,status,created_at FROM payment_orders WHERE user_id=?']; const data = await c.env.DB.batch(queries.map(q => c.env.DB.prepare(q).bind(uid))); const bookings = await c.env.DB.prepare('SELECT id,activity,start_at,end_at,venue,introduction,status FROM bookings WHERE requester_id=? OR companion_id=?').bind(uid, uid).all(); const messages = await c.env.DB.prepare('SELECT id,conversation_id,body,created_at FROM messages WHERE sender_id=?').bind(uid).all(); const reports = await c.env.DB.prepare('SELECT id,reason,status,created_at FROM reports WHERE reporter_id=?').bind(uid).all(); return c.json({ account: { ...safeUser(u, c.env), dob: u.dob, created_at: u.created_at }, profile: data[0].results, consent: data[1].results, membership: data[2].results, orders: data[3].results, bookings: bookings.results, sent_messages: messages.results, reports: reports.results }) })
 api.post('/account/deletion', auth, async c => { const uid = c.get('user').id; await c.env.DB.batch([c.env.DB.prepare('INSERT OR IGNORE INTO deletion_requests(user_id) VALUES(?)').bind(uid), c.env.DB.prepare('UPDATE profiles SET visible=0 WHERE user_id=?').bind(uid)]); return c.json({ success: true, status: 'pending-review' }) })
 
+const privateCities = ['Bengaluru', 'Mumbai', 'Delhi', 'Pune', 'Hyderabad']
+const privateActivities = ['Coffee & conversations', 'Food & dining', 'Movies', 'City exploring', 'Events & music']
+api.get('/notification-preferences', auth, async c => {
+ const row = await c.env.DB.prepare('SELECT enabled,city,activities FROM notification_preferences WHERE user_id=?').bind(c.get('user').id).first()
+ return c.json({ preferences: row ? { enabled: !!row.enabled, city: row.city, activities: JSON.parse(row.activities) } : { enabled: false, city: '', activities: [] }, channels: { in_app: true, email: false, push: false } })
+})
+api.put('/notification-preferences', auth, async c => {
+ const u = c.get('user'), b = await c.req.json()
+ if (typeof b.enabled !== 'boolean' || !privateCities.includes(b.city) || !Array.isArray(b.activities) || !b.activities.length || b.activities.length > 5 || b.activities.some((a: unknown) => !privateActivities.includes(a as string))) fail(400, 'Choose a supported city and at least one activity.')
+ if (b.enabled && b.consent !== true) fail(400, 'Please opt in to private in-app invitations.')
+ if (await c.env.DB.prepare('SELECT 1 FROM deletion_requests WHERE user_id=?').bind(u.id).first()) fail(403, 'Matching is unavailable while account deletion is pending.')
+ await c.env.DB.prepare("INSERT INTO notification_preferences(user_id,enabled,city,activities) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET enabled=excluded.enabled,city=excluded.city,activities=excluded.activities,updated_at=unixepoch(),consent_version='private-notifications-v1'").bind(u.id, b.enabled ? 1 : 0, b.city, JSON.stringify([...new Set(b.activities)])).run()
+ return c.json({ success: true, message: b.enabled ? 'Preferences saved. Private invitations are delivered in-app once your email, adult verification, and membership are eligible.' : 'New private invitation notifications are paused.' })
+})
+api.post('/private-plans', auth, async c => {
+ const u = await eligible(c), b = await c.req.json()
+ await limit(c, 'private-plan:' + u.id, 5, 3600)
+ if (await c.env.DB.prepare('SELECT 1 FROM deletion_requests WHERE user_id=?').bind(u.id).first()) fail(403, 'Matching is unavailable while account deletion is pending.')
+ if (!privateCities.includes(b.city) || !privateActivities.includes(b.activity) || b.consent !== true) fail(400, 'Choose a city and activity and confirm your consent.')
+ const start = Number(b.start_at), end = Number(b.end_at)
+ if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < now() + 3600 || start > now() + 90 * 86400 || ![3600, 5400, 7200].includes(end - start)) fail(400, 'Choose a time at least one hour ahead, within 90 days, for 60, 90, or 120 minutes.')
+ const planId = id()
+ await c.env.DB.prepare('INSERT INTO private_plans(id,owner_id,city,activity,start_at,end_at) VALUES(?,?,?,?,?,?)').bind(planId, u.id, b.city, b.activity, start, end).run()
+ // Do not reveal matching member counts, identities, or who opted out.
+ return c.json({ id: planId, status: 'open', message: 'Your private interest is saved. Matching opted-in, eligible members receive an in-app invitation. This does not guarantee a match or confirm a meeting.' }, 201)
+})
+api.get('/private-plans', auth, async c => {
+ const { results } = await c.env.DB.prepare("SELECT id,city,activity,start_at,end_at,CASE WHEN status='open' AND start_at<=? THEN 'expired' ELSE status END AS status,created_at FROM private_plans WHERE owner_id=? ORDER BY created_at DESC LIMIT 50").bind(now(), c.get('user').id).all()
+ return c.json({ plans: results })
+})
+api.post('/private-plans/:id/cancel', auth, async c => {
+ const r = await c.env.DB.prepare("UPDATE private_plans SET status='cancelled' WHERE id=? AND owner_id=? AND status='open'").bind(c.req.param('id'), c.get('user').id).run()
+ if (!r.meta.changes) fail(404, 'An open plan was not found.')
+ return c.json({ success: true })
+})
+api.get('/notifications', auth, async c => {
+ const uid = c.get('user').id
+ const { results } = await c.env.DB.prepare(`SELECT n.id,n.kind,n.body,n.read_at,n.created_at,i.id AS invitation_id,i.state,p.city,p.activity,p.start_at,p.end_at,
+ CASE WHEN p.owner_id=? THEN 'owner' ELSE 'recipient' END AS invitation_role
+ FROM notifications n LEFT JOIN private_invitations i ON i.id=n.invitation_id LEFT JOIN private_plans p ON p.id=i.plan_id
+ LEFT JOIN users owner ON owner.id=p.owner_id LEFT JOIN users recipient ON recipient.id=i.recipient_id
+ LEFT JOIN memberships om ON om.user_id=owner.id LEFT JOIN memberships rm ON rm.user_id=recipient.id
+ WHERE n.user_id=? AND (n.invitation_id IS NULL OR (
+ p.status='open' AND p.start_at>? AND (p.owner_id=? OR i.recipient_id=?)
+ AND owner.suspended=0 AND recipient.suspended=0 AND owner.email_verified=1 AND recipient.email_verified=1
+ AND owner.adult_verified=1 AND recipient.adult_verified=1 AND om.status='active' AND rm.status='active'
+ AND NOT EXISTS(SELECT 1 FROM deletion_requests WHERE user_id IN (p.owner_id,i.recipient_id))
+ AND NOT EXISTS(SELECT 1 FROM blocks WHERE (blocker_id=p.owner_id AND blocked_id=i.recipient_id) OR (blocker_id=i.recipient_id AND blocked_id=p.owner_id))))
+ ORDER BY n.created_at DESC,n.id DESC LIMIT 50`).bind(uid, uid, now(), uid, uid).all()
+ const notifications = results.map((n: any) => ({ id: n.id, kind: n.kind, body: n.body, read_at: n.read_at, created_at: n.created_at, invitation: n.invitation_id ? { id: n.invitation_id, role: n.invitation_role, state: n.state, city: n.city, activity: n.activity, start_at: n.start_at, end_at: n.end_at } : null }))
+ return c.json({ notifications, unread: notifications.filter((n: any) => !n.read_at).length, delivery: 'in-app-only' })
+})
+api.post('/notifications/:id/read', auth, async c => {
+ const r = await c.env.DB.prepare('UPDATE notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').bind(now(), c.req.param('id'), c.get('user').id).run()
+ if (!r.meta.changes) fail(404, 'Notification not found.')
+ return c.json({ success: true })
+})
+api.post('/private-invitations/:id/respond', auth, async c => {
+ const u = await eligible(c), b = await c.req.json()
+ await limit(c, 'private-response:' + u.id, 30, 3600)
+ if (!['interested','declined'].includes(b.response)) fail(400, 'Choose interested or decline.')
+ const r = await c.env.DB.prepare(`UPDATE private_invitations SET state=?,responded_at=?
+ WHERE id=? AND recipient_id=? AND state='pending' AND EXISTS(
+ SELECT 1 FROM private_plans p JOIN users owner ON owner.id=p.owner_id JOIN memberships om ON om.user_id=owner.id
+ JOIN users recipient ON recipient.id=private_invitations.recipient_id JOIN memberships rm ON rm.user_id=recipient.id
+ WHERE p.id=private_invitations.plan_id AND p.status='open' AND p.start_at>?
+ AND owner.email_verified=1 AND owner.adult_verified=1 AND owner.suspended=0 AND om.status='active'
+ AND recipient.email_verified=1 AND recipient.adult_verified=1 AND recipient.suspended=0 AND rm.status='active'
+ AND NOT EXISTS(SELECT 1 FROM deletion_requests WHERE user_id IN (owner.id,recipient.id))
+ AND NOT EXISTS(SELECT 1 FROM blocks WHERE (blocker_id=owner.id AND blocked_id=recipient.id) OR (blocker_id=recipient.id AND blocked_id=owner.id)))`).bind(b.response, now(), c.req.param('id'), u.id, now()).run()
+ if (!r.meta.changes) fail(404, 'This invitation is unavailable or has already been answered.')
+ return c.json({ success: true, message: b.response === 'interested' ? 'Your interest was shared privately. No name, photo, or contact details were disclosed. This is not a confirmed meeting.' : 'Invitation declined. No decline notification is sent to the other member.' })
+})
+api.post('/private-invitations/:id/block', auth, async c => {
+ const uid = c.get('user').id
+ const row = await c.env.DB.prepare('SELECT p.owner_id,i.recipient_id FROM private_invitations i JOIN private_plans p ON p.id=i.plan_id WHERE i.id=? AND (i.recipient_id=? OR p.owner_id=?)').bind(c.req.param('id'), uid, uid).first()
+ if (!row) fail(404, 'Invitation not found.')
+ const other = row.owner_id === uid ? row.recipient_id : row.owner_id
+ await c.env.DB.prepare('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id) VALUES(?,?)').bind(uid, other).run()
+ return c.json({ success: true, message: 'This member is blocked. Their invitations will no longer appear.' })
+})
+
 async function razor(env: Env, path: string, method = 'GET', body?: any) { const response = await fetch(`https://api.razorpay.com/v1/${path}`, { method, headers: { Authorization: 'Basic ' + btoa(env.RAZORPAY_KEY_ID + ':' + env.RAZORPAY_KEY_SECRET), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!response.ok) fail(502, 'The payment provider could not complete this request.'); return response.json() as Promise<any> }
 async function paymentReady(c: any) { const s = await settings(c.env.DB); if (c.env.PAYMENTS_ENABLED !== 'true' || !c.env.RAZORPAY_KEY_ID || !c.env.RAZORPAY_KEY_SECRET || !c.env.RAZORPAY_WEBHOOK_SECRET || s.tax_configured !== 'true' || s.pricing_approved !== 'true') fail(503, 'Payments are disabled pending merchant approval, credentials, tax configuration, and legal review.'); return s }
 api.post('/payments/order', auth, async c => { const s = await paymentReady(c); const u = c.get('user'); if (!u.email_verified) fail(403, 'Please verify your email first.'); if (u.gender !== 'man') fail(409, 'This paid plan does not apply to your account.'); if (u.membership === 'active') fail(409, 'Your membership is already active.'); if (u.membership === 'revoked') fail(409, 'Your payment history requires manual review before a new purchase.'); await limit(c, 'payment:' + u.id, 5, 3600); const existing = await c.env.DB.prepare("SELECT id,amount,currency FROM payment_orders WHERE user_id=? AND status='created'").bind(u.id).first(); if (existing) return c.json({ order: existing, key_id: c.env.RAZORPAY_KEY_ID }); const amount = Number(s.male_amount); if (!Number.isSafeInteger(amount) || amount !== 29900) fail(503, 'The approved membership amount must be reviewed before checkout.'); const order = await razor(c.env, 'orders', 'POST', { amount, currency: 'INR', receipt: id(), notes: { user_id: u.id, purpose: 'one-time membership' } }); await c.env.DB.prepare("INSERT INTO payment_orders(id,user_id,amount,currency,status) VALUES(?,?,?,?,'created')").bind(order.id, u.id, amount, 'INR').run(); return c.json({ order: { id: order.id, amount, currency: 'INR' }, key_id: c.env.RAZORPAY_KEY_ID }) })
