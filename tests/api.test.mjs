@@ -8,7 +8,7 @@ const sql=q=>JSON.parse(execFileSync('npx',['wrangler','d1','execute','togetherl
 async function request(path,body,cookie='',method=body===undefined?'GET':'POST',origin=base){const r=await fetch(base+'/api'+path,{method,headers:{'Content-Type':'application/json','CF-Connecting-IP':`192.0.2.${1+suffix%254}`,Origin:origin,...(cookie?{Cookie:cookie}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});const text=await r.text();let data;try{data=JSON.parse(text)}catch{data=text}return{status:r.status,data,headers:r.headers,cookie:r.headers.get('set-cookie')?.split(';')[0]||cookie};}
 const test=async(name,fn)=>{await fn();passed++;console.log('PASS '+name);};
 try{
-await test('health and launch gates',async()=>{assert.equal((await request('/health')).data.status,'ok');assert.equal((await request('/config')).data.payments_enabled,false);});
+await test('health and launch gates',async()=>{assert.equal((await request('/health')).data.status,'ok');const config=(await request('/config')).data;assert.equal(config.payments_enabled,false);assert.equal('female_amount' in config.pricing,false);});
 await test('anonymous private access denied',async()=>{assert.equal((await request('/profile')).status,401);assert.equal((await request('/bookings')).status,401);assert.equal((await request('/account/export')).status,401);});
 await test('foreign origin rejected',async()=>{assert.equal((await request('/auth/login',{email:'x@example.com',password:'not-a-password'},'','POST','https://evil.example')).status,403);});
 await test('minor registration rejected',async()=>{assert.equal((await request('/auth/register',{email:`minor-${suffix}@example.com`,password:'ValidPassword-test123',name:'Test Minor',dob:'2020-01-01',gender:'woman',consent:true})).status,400);});

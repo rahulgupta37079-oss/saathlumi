@@ -41,6 +41,7 @@ An adults-only, strictly platonic companion-booking application for India. Warm 
 
 ### Membership
 
+- Public presentation no longer advertises free membership for women: the homepage/pricing card, FAQs, and draft terms use account-specific membership wording. The anonymous configuration API omits the female rate. Existing membership rules and private signed-in checkout details remain unchanged.
 - D1 `settings` supplies male amount 29900 paise and female amount 0.
 - Women receive active free membership; men have an inactive membership until a verified capture; self-described/undisclosed genders receive `pending-policy`.
 - Registration is free for everyone. ₹299 is a one-time platform fee, not a meeting charge, recurring subscription, or guarantee of consent.
