@@ -11,7 +11,9 @@
     "test:browser": "node tests/browser.test.mjs",
     "test:payments": "node --test tests/payment.test.mjs",
     "test:cashfree": "node --test tests/cashfree.test.mjs",
-    "deploy": "npm run build && wrangler pages deploy",
+    "deploy": "npm run deploy:byok",
+    "deploy:byok": "npm run build && cd deploy/byok && wrangler pages deploy ../../dist --project-name webapp-2 --branch main",
+    "db:migrate:byok": "wrangler d1 migrations apply webapp-2-production --remote --config deploy/byok/wrangler.jsonc",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {

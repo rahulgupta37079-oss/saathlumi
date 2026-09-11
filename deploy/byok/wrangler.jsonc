@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "webapp-2",
+  "compatibility_date": "2026-09-08",
+  "pages_build_output_dir": "../../dist",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://webapp-2-1hj.pages.dev",
+    "CASHFREE_ENV": "sandbox",
+    "CASHFREE_SANDBOX_ENABLED": "false",
+    "PAYMENTS_ENABLED": "false"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webapp-2-production",
+      "database_id": "af00ec3a-a089-43e8-b86a-fc17cdbf242e",
+      "migrations_dir": "../../migrations"
+    }
+  ]
+}

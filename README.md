@@ -4,16 +4,34 @@ An adults-only, private, strictly platonic meeting-interest platform for India. 
 
 ## Current status
 
-**Development preview; not production-ready.** Private account/notification flows are implemented. Cashfree **sandbox-only** checkout is implemented but remains disabled until fresh sandbox secrets and a whitelisted HTTPS origin are configured. No actual Cashfree transaction has been processed during development.
+**Deployed development preview; not ready for unrestricted live payments or meetings.** Private account/notification flows are implemented. Cashfree **sandbox-only** checkout is implemented but remains disabled until fresh sandbox secrets and a whitelisted HTTPS origin are configured. No actual Cashfree transaction has been processed during development.
 
 Private verification requirements are implemented: age verification and selfie/liveness for everyone; an ID check for men using masked Aadhaar or a viable alternative. **Document and selfie collection and provider verification are not implemented/enabled.** No image upload can mark an account verified. Live matching stays gated until all required verification results and membership conditions are met.
 
 - Preview: https://3000-in1a4e08bsgdp4voh3kqb-18e660f9.sandbox.novita.ai
 - Local: http://localhost:3000
 - Health: `/api/health`
-- Production: not deployed; the sandbox URL is temporary.
+- Genspark-managed site: https://af99fa8c-67ee-4782-b601-a54cf886dadb.vip.gensparksite.com
+- User-owned Cloudflare Pages site: https://webapp-2-1hj.pages.dev
+- GitHub: https://github.com/rahulgupta37079-oss/saathlumi
+- Both public deployments are online in preview mode. Payments and document/selfie collection remain disabled.
 - Source: `/home/user/webapp`, branch `main`.
 - Stack: Hono/TypeScript, Cloudflare Pages/Workers, D1, browser JavaScript/CSS.
+
+## Deployment configuration
+
+Two independent deployments were published and verified on 2026-09-11. All three migrations were applied to each remote D1 database. Homepage, JS/CSS assets and health checks return 200; private Cashfree configuration returns 401 without login, and removed photos return 404. Both browser checks reported no console errors.
+
+| Hosting | Configuration | Database |
+| --- | --- | --- |
+| Genspark-managed | Root `wrangler.jsonc`; pipeline provisions its own binding | `af99fa8c-67ee-4782-b601-a54cf886dadb-db` |
+| User-owned Pages, project `webapp-2` | `deploy/byok/wrangler.jsonc` | `webapp-2-production` (APAC) |
+
+Accounts, sessions, notifications and payments are **not synchronized** between these sites. Existing unrelated Cloudflare projects were not overwritten. The connected GitHub starter history is preserved rather than force-pushed away.
+
+For user-owned redeploys after configuring the user's Cloudflare token: `npm run db:migrate:byok` then `npm run deploy:byok` (also the default `npm run deploy`). Pages requires its config to be named `wrangler.jsonc`; the deploy command runs from `deploy/byok` because Pages rejects custom config paths. The root config remains available for local development and managed deployment.
+
+For managed redeploys: run `gsk hosted deploy`, obtain user approval, then wait for the pending action to complete. Do not use rebuild flags for normal schema migrations. `APP_ORIGIN` is set to the managed site URL using a hosted secret binding; verify it remains configured after future redeploys. User-owned origin and disabled-payment flags are explicit in its configuration.
 
 ## Credential incident and next action
 
@@ -178,7 +196,7 @@ curl http://localhost:3000/api/health
 pm2 logs webapp --nostream
 ```
 
-Wrangler has a local placeholder D1 ID (`00000000-0000-0000-0000-000000000001`). Production provisioning/deployment requires choosing a hosting path. Do not deploy test fixtures. Restart after clean builds to refresh Wrangler’s asset manifest; verify `/static/app.js` returns 200 and removed photos return 404.
+The root Wrangler config intentionally retains a local placeholder D1 ID (`00000000-0000-0000-0000-000000000001`) for development and managed auto-provisioning. User-owned production uses the isolated `deploy/byok/wrangler.jsonc` with its actual D1 binding; do not use the root config for direct Pages deployment. Do not deploy test fixtures. Restart after clean builds to refresh Wrangler’s asset manifest; verify `/static/app.js` returns 200 and removed photos return 404.
 
 Use test details and a unique test password. For authentication email, configure `APP_ORIGIN`, `EMAIL_API_KEY` (Resend), `EMAIL_FROM`, sending-domain SPF/DKIM/DMARC, and verify delivery/expiry/failure flows. Invitation emails and optional phone OTP are separate unimplemented features.
 
@@ -202,7 +220,7 @@ Playwright needs Chromium and Linux libraries (`npx playwright install chromium`
 - Legal review of gender-based prices/ID requirements and pricing for other identities, final policies/entity/grievance contacts/retention and statutory financial exceptions.
 - Mutual meeting confirmation, consent-based optional disclosure, conflict-free private booking continuation, staffed moderation/reporting/support and appeals.
 - Harden authentication, distributed abuse controls, token/session/notification retention, monitoring, recovery drills and security review.
-- Choose managed hosting or the owner’s Cloudflare account, provision actual D1/secrets, and approve deployment. No production deploy was performed.
+- Hosting and D1 provisioning are complete on both selected paths. Payment/email/verification provider setup is still separate and must be configured per site. Do not treat successful website deployment as approval to collect money or identity documents.
 - No 24/7 support/emergency-monitoring claims. Keep private pages and the preview unindexed.
 
 ## Backup and rollback
